@@ -8,4 +8,4 @@ data:
   chart: "{{ .Release.Name }}-scripts-configmap"
   description: "Helios deployment with desktop streaming"
   fields: |
-    []
+    [pullSecret]

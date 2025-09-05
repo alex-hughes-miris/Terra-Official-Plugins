@@ -1,6 +1,7 @@
 registry:
 repo:
 tag:
+pullSecret:
 group:
 cpu:
 cpuLimit:

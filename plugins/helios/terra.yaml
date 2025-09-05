@@ -8,4 +8,4 @@ tags:
   - vdi
   - juno
   - cluster-level
-fields: []
+fields: [pullSecret]
