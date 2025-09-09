@@ -33,12 +33,6 @@ spec:
         cluster-autoscaler.kubernetes.io/safe-to-evict: "false"
 
     spec:
-      securityContext:
-        runAsUser: 0                 # you already switched to sudo; run as root is simplest
-        privileged: true             # easiest, grants CAP_SYS_ADMIN + unconfined mount
-        allowPrivilegeEscalation: true
-        seccompProfile:
-          type: Unconfined
       automountServiceAccountToken: false
       hostname: "{{ .Values.name }}"
 
@@ -97,6 +91,15 @@ spec:
               memory: "{{ .Values.memoryLimit }}"
             {{- end }}
             {{- end }}
+
+          securityContext:
+            runAsUser: 0
+            runAsGroup: 0
+            privileged: true
+            allowPrivilegeEscalation: true
+            seccompProfile:
+              type: Unconfined
+
           startupProbe:
             tcpSocket:
               port: 3000
