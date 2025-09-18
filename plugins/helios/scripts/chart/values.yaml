@@ -14,6 +14,7 @@ guid: 0
 puid: 0
 host:
 pullSecret:
+escalate: false
 session:
 volumeMounts: []
 volumes: []

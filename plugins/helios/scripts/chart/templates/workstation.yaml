@@ -91,7 +91,8 @@ spec:
               memory: "{{ .Values.memoryLimit }}"
             {{- end }}
             {{- end }}
-
+            
+          {{- if .Values.escalate }}
           securityContext:
             runAsUser: 0
             runAsGroup: 0
@@ -99,6 +100,7 @@ spec:
             allowPrivilegeEscalation: true
             seccompProfile:
               type: Unconfined
+          {{- end }}
 
           startupProbe:
             tcpSocket:
