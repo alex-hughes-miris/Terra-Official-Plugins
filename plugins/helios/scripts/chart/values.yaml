@@ -23,3 +23,24 @@ env:
 selector:
 plugins: []
 _kuiper:
+dind:
+  # turn on sidecar support
+  enabled: true
+  # Supports privileged or rootless
+  mode: rootless
+  image: docker:25-dind-rootless
+  data:
+    type: emptyDir
+    pvc: ""
+  resources:
+    requests:
+      cpu: "250m"
+      memory: "1Gi"
+    limits:
+      memory: "16Gi"
+  # set to true if your main container is non-root and needs the socket
+  # chmod 666 /var/run/dind/docker.sock via helper
+  relaxSocketPerms: false
+  # (optional) extra dockerd args
+  # e.g. ["--registry-mirror=https://<mirror>"]
+  extraArgs: []

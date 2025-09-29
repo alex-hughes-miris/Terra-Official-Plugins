@@ -122,11 +122,19 @@ spec:
               value: "{{ .Values.guid }}"
             - name: PREFIX
               value: "/polaris/{{ .Values.name }}/"
+            {{- if .Values.dind.enabled }}
+            - name: DOCKER_HOST
+              value: "unix:///var/run/dind/docker.sock"
+            - name: DOCKER_BUILDKIT
+              value: "1"
+            {{- end }}
             {{- range .Values.env }}
             - name: {{ .name | quote }}
               value: {{ .value | quote }}
             {{- end }}
           volumeMounts:
+            - mountPath: /dev/shm
+              name: shm
             {{- if .Values.volumeMounts }}
             {{- toYaml .Values.volumeMounts | nindent 12 }}
             {{- end }}
@@ -137,7 +145,83 @@ spec:
               mountPath: "/etc/helios/init.d/{{ .name }}/{{ .file }}"
             {{- end }}
             {{- end }}
+            {{- if .Values.dind.enabled }}
+            - name: docker-run
+              mountPath: /var/run/dind
+            {{- end }}
+        {{- if .Values.dind.enabled }}
+        - name: dind
+          image: "{{ .Values.dind.image }}"
+          {{- if eq .Values.dind.mode "privileged" }}
+          securityContext:
+            privileged: true
+          {{- else }}
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+          {{- end }}
+          env:
+            - name: DOCKER_TLS_CERTDIR
+              value: ""
+            {{- if eq .Values.dind.mode "rootless" }}
+            # rootless dockerd reads DOCKER_HOST for its own socket path
+            - name: DOCKER_HOST
+              value: "unix:///var/run/dind/docker.sock"
+            {{- end }}
+          args:
+            - "--host=unix:///var/run/dind/docker.sock"
+            - "--data-root=/var/lib/docker"
+            - "--log-driver=json-file"
+            - "--log-opt=max-size=10m"
+            - "--log-opt=max-file=3"
+            {{- range .Values.dind.extraArgs }}
+            - {{ . | quote }}
+            {{- end }}
+          resources:
+            {{- toYaml .Values.dind.resources | nindent 12 }}
+          readinessProbe:
+            exec:
+              command: ["/bin/sh","-lc","[ -S /var/run/dind/docker.sock ]"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -lc
+                - >
+                  echo -e "GET /_ping HTTP/1.0\r\n\r\n" |
+                  socat - UNIX-CONNECT:/var/run/dind/docker.sock | grep -q OK
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            failureThreshold: 3
+          volumeMounts:
+            - name: docker-run
+              mountPath: /var/run/dind
+            - name: docker-graph
+              mountPath: /var/lib/docker
+        {{- if .Values.dind.relaxSocketPerms }}
+        - name: dind-sock-perms
+          image: alpine:3.20
+          command: ["/bin/sh","-lc"]
+          args:
+            - |
+              while true; do
+                if [ -S /var/run/dind/docker.sock ]; then chmod 666 /var/run/dind/docker.sock; fi
+                sleep 2
+              done
+          volumeMounts:
+            - name: docker-run
+              mountPath: /var/run/dind
+          resources:
+            requests: { cpu: "5m", memory: "16Mi" }
+        {{- end }}
+        {{- end }}
       volumes:
+        - name: shm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 16Gi
         {{- if .Values.volumeMounts }}
         {{- toYaml .Values.volumes | nindent 8 }}
         {{- end }}
@@ -148,4 +232,15 @@ spec:
             name: {{ .config | quote }}
             defaultMode: 0777
         {{- end }}
+        {{- end }}
+        {{- if .Values.dind.enabled }}
+        - name: docker-run
+          emptyDir: {}
+        - name: docker-graph
+          {{- if eq .Values.dind.data.type "pvc" }}
+          persistentVolumeClaim:
+            claimName: {{ required "dind.data.pvc must be set when dind.data.type=pvc" .Values.dind.data.pvc | quote }}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
         {{- end }}
